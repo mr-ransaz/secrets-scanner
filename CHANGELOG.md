@@ -6,3 +6,7 @@
   fingerprint baselines, safe traversal, text and JSON output.
 - Added bounded offline Git history, SARIF 2.1.0, self-contained escaped HTML,
   masking of secret-like path labels and subprocess smoke verification.
+- Added Windows single-file executable packaging, executable/wheel verifiers,
+  local release checksums, read-only cross-platform CI and optional release CI.
+- Protected output hard links and redacted detected values in metadata;
+  documented thresholds, security design, local evidence and remaining checks.

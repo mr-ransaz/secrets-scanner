@@ -7,7 +7,14 @@ import subprocess
 import threading
 from pathlib import Path
 
-from secretscan.scanner import DEFAULT_EXCLUDES, Result, ScanError, excluded, scan_line
+from secretscan.scanner import (
+    DEFAULT_EXCLUDES,
+    Result,
+    ScanError,
+    excluded,
+    redact_metadata,
+    scan_line,
+)
 
 MAX_GIT_OUTPUT = 8 * 1048576
 GIT_TIMEOUT = 30
@@ -77,7 +84,9 @@ def scan_history(
     excludes: tuple[str, ...] = (),
     max_file_size: int = 1048576,
     baseline: set[str] | None = None,
+    _sensitive: set[str] | None = None,
 ) -> None:
+    sensitive = set() if _sensitive is None else _sensitive
     executable = shutil.which("git")
     if not executable:
         raise ScanError("git is required for --git-history")
@@ -171,8 +180,17 @@ def scan_history(
                     number = int(hunk[1])
                 elif number is not None and line.startswith("+"):
                     result.findings.extend(
-                        scan_line(line[1:], relative, number, minimum, baseline, commit)
+                        scan_line(
+                            line[1:],
+                            relative,
+                            number,
+                            minimum,
+                            baseline,
+                            commit,
+                            sensitive,
+                        )
                     )
                     number += 1
                 elif number is not None and line.startswith(" "):
                     number += 1
+    redact_metadata(result, sensitive)

@@ -154,6 +154,7 @@ def test_html_hostile_and_sarif(tmp_path, capsys):
     assert data["version"] == "2.1.0"
     assert "$schema" in data
     run = data["runs"][0]
+    assert run["columnKind"] == "unicodeCodePoints"
     assert run["tool"]["driver"]["name"] == "secretscan"
     rule_ids = {r["id"] for r in run["tool"]["driver"]["rules"]}
     for finding in run["results"]:

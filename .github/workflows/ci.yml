@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: .venv/bin/python
+            pytest: .venv/bin/pytest
+          - os: windows-latest
+            python: .venv/Scripts/python.exe
+            pytest: .venv/Scripts/pytest.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Create project venv
+        run: python -m venv .venv
+      - name: Install pinned dev tools
+        run: ${{ matrix.python }} -m pip install -e '.[dev]'
+      - name: Dependency check
+        run: ${{ matrix.python }} -m pip check
+      - name: Lint
+        run: ${{ matrix.python }} -m ruff check .
+      - name: Format
+        run: ${{ matrix.python }} -m ruff format --check .
+      - name: Module pytest with branch coverage
+        run: ${{ matrix.python }} -m pytest -q
+      - name: Executable pytest
+        run: ${{ matrix.pytest }} -q
+      - name: Live subprocess smoke
+        run: ${{ matrix.python }} scripts/smoke_test.py
+      - name: Self scan
+        run: ${{ matrix.python }} -m secretscan scan .
+      - name: Build wheel and sdist
+        run: ${{ matrix.python }} -m build
+      - name: Isolated wheel verification
+        run: ${{ matrix.python }} scripts/verify_wheel.py
+      - name: Build Windows executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/build_exe.ps1
+      - name: Verify Windows executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/verify_exe.ps1
+      - name: Release artifact checksums
+        if: runner.os == 'Windows'
+        run: ${{ matrix.python }} scripts/checksums.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: local-build-${{ matrix.os }}
+          path: dist/*
+          if-no-files-found: error

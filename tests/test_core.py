@@ -1,4 +1,5 @@
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -106,6 +107,10 @@ def test_unquoted_literals_and_labels(tmp_path):
     assert secret_name not in json.dumps(scan(root).to_dict())
     overlapping = "pass" + "word=" + samples()["high-entropy"]
     assert samples()["high-entropy"] not in safe_label(overlapping)
+    generic_root = tmp_path / ("prefix_" + value)
+    generic_root.mkdir()
+    (generic_root / ("prefix_" + value + ".txt")).write_text("password=" + value)
+    assert value not in json.dumps(scan(generic_root).to_dict())
 
 
 def test_files(tmp_path):
@@ -173,7 +178,12 @@ def test_no_network(tmp_path, monkeypatch):
 
 def test_adversarial_runtime():
     start = time.monotonic()
-    for value in ["a" * 1048576, "password " * 100000, "eyJ" + "a" * 500000 + "."]:
+    for value in [
+        "a" * 1048576,
+        "password " * 100000,
+        "eyJ" + "a" * 500000 + ".",
+        "password=" + "a" * 1048576,
+    ]:
         assert not scan_line(value, "x", 1)
     assert time.monotonic() - start < 5
 
@@ -222,6 +232,9 @@ def test_usage_errors(arguments, capsys):
 def test_runtime_errors(tmp_path, capsys):
     assert main(["scan", str(tmp_path / "missing")]) == 2
     assert main(["scan", str(tmp_path), "--max-file-size", "0"]) == 2
+    target = tmp_path / "small.txt"
+    target.touch()
+    assert main(["scan", str(target), "--max-file-size", str(2**100)]) == 2
     assert main(["scan", str(tmp_path), "--output", str(tmp_path / "out")]) == 2
     assert "error" in capsys.readouterr().err
     assert (
@@ -315,6 +328,40 @@ def test_module_entry():
     )
     assert run.returncode == 0
     assert run.stdout.strip() == "secretscan 0.1.0"
+
+
+def test_output_hardlink_guard(tmp_path):
+    root = tmp_path / "tree"
+    root.mkdir()
+    original = root / "sample.txt"
+    original.write_text("harmless")
+    alias = tmp_path / "output.json"
+    os.link(original, alias)
+    assert (
+        main(["scan", str(root), "--format", "json", "--output", str(alias), "--force"])
+        == 2
+    )
+    assert original.read_text() == "harmless"
+
+
+def test_real_links_when_available(tmp_path, monkeypatch):
+    root = tmp_path / "tree"
+    root.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text(lines()["aws-access-key"])
+    loop = root / "loop"
+    link = root / "outside.txt"
+    try:
+        loop.symlink_to(root, target_is_directory=True)
+        link.symlink_to(outside)
+    except OSError:
+        # Windows without link privilege: simulate the same filesystem answers.
+        monkeypatch.setattr(Path, "is_symlink", lambda self: self in {loop, link})
+        loop.mkdir(exist_ok=True)
+        link.touch(exist_ok=True)
+    result = scan(root)
+    assert result.skipped == {"symlink": 2}
+    assert not result.findings
 
 
 def test_repository_self_scan():

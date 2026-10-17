@@ -2,7 +2,7 @@
 
 import fnmatch
 import os
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -91,6 +91,7 @@ def scan_line(
     minimum: str = "low",
     baseline: set[str] | None = None,
     commit: str | None = None,
+    sensitive: set[str] | None = None,
 ) -> list[Finding]:
     if "secretscan:ignore" in text:
         return []
@@ -102,6 +103,8 @@ def scan_line(
             value, start, end = match_value(rule, match)
             if not accepted(rule, value):
                 continue
+            if sensitive is not None:
+                sensitive.add(value)
             digest = fingerprint(rule.id, path, value)
             if baseline and digest in baseline:
                 continue
@@ -130,6 +133,18 @@ def excluded(path: str, patterns: tuple[str, ...]) -> bool:
     )
 
 
+def redact_metadata(result: Result, sensitive: set[str]) -> None:
+    """Remove detected values even when embedded in an unrelated filename."""
+
+    def redact(label: str) -> str:
+        for value in sorted(sensitive, key=len, reverse=True):
+            label = label.replace(value, mask(value))
+        return label
+
+    result.root_name = redact(result.root_name)
+    result.findings = [replace(f, file=redact(f.file)) for f in result.findings]
+
+
 def scan(
     root: Path,
     *,
@@ -137,11 +152,13 @@ def scan(
     excludes: tuple[str, ...] = (),
     max_file_size: int = 1048576,
     baseline: set[str] | None = None,
+    _sensitive: set[str] | None = None,
 ) -> Result:
     if not root.exists():
         raise ScanError("scan path does not exist")
     result = Result(root.name)
     patterns = DEFAULT_EXCLUDES + excludes
+    sensitive = set() if _sensitive is None else _sensitive
     base = root if root.is_dir() else root.parent
 
     def read(path: Path) -> None:
@@ -169,7 +186,9 @@ def scan(
                 content.decode("utf-8", errors="replace").splitlines(), 1
             ):
                 result.findings.extend(
-                    scan_line(line, relative, number, minimum, baseline)
+                    scan_line(
+                        line, relative, number, minimum, baseline, sensitive=sensitive
+                    )
                 )
         except OSError:
             result.skip("unreadable")
@@ -194,4 +213,5 @@ def scan(
             dirs[:] = kept
             for name in sorted(files):
                 read(Path(folder) / name)
+    redact_metadata(result, sensitive)
     return result

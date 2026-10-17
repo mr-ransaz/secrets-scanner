@@ -46,6 +46,7 @@ def sarif(result: Result) -> dict:
         "version": "2.1.0",
         "runs": [
             {
+                "columnKind": "unicodeCodePoints",
                 "tool": {
                     "driver": {
                         "name": "secretscan",

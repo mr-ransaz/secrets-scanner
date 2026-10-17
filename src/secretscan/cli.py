@@ -74,6 +74,8 @@ def validate_destinations(
             raise ScanError("output inside scan tree requires --allow-in-tree")
         if path.is_symlink() or path.is_junction() or (path.exists() and not force):
             raise ScanError("output exists; use --force for a regular file")
+        if path.exists() and (not path.is_file() or path.stat().st_nlink > 1):
+            raise ScanError("output must be a regular file without hard links")
 
 
 def write(path: Path, content: str, force: bool) -> None:
@@ -128,12 +130,14 @@ def main(argv: list[str] | None = None) -> int:
             args.allow_in_tree,
         )
         baseline = load_baseline(args.baseline)
+        sensitive = set()
         result = scan(
             root,
             minimum=args.min_severity,
             excludes=tuple(args.exclude),
             max_file_size=args.max_file_size,
             baseline=baseline,
+            _sensitive=sensitive,
         )
         if args.git_history:
             scan_history(
@@ -144,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
                 excludes=tuple(args.exclude),
                 max_file_size=args.max_file_size,
                 baseline=baseline,
+                _sensitive=sensitive,
             )
         output = (
             json.dumps(
@@ -167,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
             }
             write(args.write_baseline, json.dumps(data, indent=2) + "\n", args.force)
         return int(bool(result.findings))
-    except (ScanError, OSError) as error:
+    except (ScanError, OSError, ValueError, OverflowError) as error:
         # Constant errors avoid leaking secret-bearing paths or OS exception details.
         import sys
 

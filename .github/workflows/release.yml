@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+  publish:
+    needs: verify
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Build verified release artifacts
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m venv .venv
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./.venv/Scripts/python.exe -m pip install -e '.[dev]'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./.venv/Scripts/python.exe -c "import os; from secretscan import __version__; assert os.environ['RELEASE_TAG'] == 'v' + __version__"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./.venv/Scripts/python.exe -m build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./.venv/Scripts/python.exe scripts/verify_wheel.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./scripts/build_exe.ps1
+          ./scripts/verify_exe.ps1
+          ./.venv/Scripts/python.exe scripts/checksums.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Publish release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $releaseAssets = @(Get-ChildItem -LiteralPath dist -File | Where-Object {
+            $_.Name -eq 'secretscan.exe' -or $_.Name -eq 'SHA256SUMS' -or
+            $_.Extension -eq '.whl' -or $_.Name.EndsWith('.tar.gz')
+          } | ForEach-Object { $_.FullName })
+          if ($releaseAssets.Count -ne 4) { throw 'Expected exactly four release assets' }
+          gh release create "$env:RELEASE_TAG" --verify-tag --title "secrets-scanner $env:RELEASE_TAG" --notes "Unsigned Windows executable, wheel, sdist and SHA-256 checksums. See README for scope and limitations." @releaseAssets
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

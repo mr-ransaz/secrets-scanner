@@ -61,3 +61,56 @@
 - Final Stage 2 gates: Ruff check/format, both pytest entries (44 each), diff
   check passed; placeholder matches only documented AGENTS.md exceptions.
   Repository self-scan: 20 files, zero findings, exit 0.
+
+## Stage 3
+
+- Last implementation checkpoint before this stage: fbd906e.
+- PyInstaller 6.22.3 with contrib hooks 2026.8 built the Windows x64 console
+  executable using Python 3.14.0 and packaging/secretscan.spec. Final executable
+  size: 9,507,836 bytes. UPX is disabled; bytecode optimization level is 1.
+- Chosen layout: one file. This locally verified build provides exactly one
+  executable artifact and needs no installed Python. It extracts its bundled
+  runtime on startup, which adds startup cost and requires a writable temp
+  directory. Build and verification scripts set project-local temp/cache paths,
+  restore environment variables and remove their own scratch directories.
+- Final executable verification output (exit 0):
+  `smoke: text/json/sarif/html, exits 0/1/2, baseline, masking: PASS`
+  `exe verification: PASS; version, rules, text/JSON/SARIF/HTML, exits, baseline, masking`
+- Executable README examples returned 0 for version/rules, 1 for the synthetic
+  text/HTML scan, and 0 for an additional high-severity repository history scan.
+- Wheel and sdist build succeeded, including a wheel built from the sdist.
+  Disposable venv wheel verification passed: no-index/no-deps installation,
+  console version/rules/scans and full smoke from a different working directory,
+  plus pip check. The directory is inside ignored .work to honor project-only
+  writes; it is not the repository root. Temporary venvs are removed in finally.
+- New output protection rejects hard-linked destinations even with force;
+  an actual project-local hard-link regression test passed outside the restricted
+  app sandbox. The restricted sandbox denied creating that link. Symlink
+  privilege was unavailable even in the filesystem-capable run, so Windows
+  loop/outside-link tests use deterministic mocks; historical link tree entries
+  are tested with real Git metadata. Unreadable-file tests also use mocks.
+- All detected values are also removed from path/root metadata before output,
+  including generic credentials embedded in otherwise unrelated filenames.
+  Raw match values exist only in transient scan memory, never result objects,
+  serialized artifacts or logs. SARIF declares Unicode code-point columns.
+- Final module/executable pytest runs: 46 passed each. Combined coverage 98.78%,
+  branch measurement enabled: 359/363 statements and 128/130 branches (98.46%).
+  Ruff check/format, diff check and live smoke passed. Placeholder matches are
+  only the documented AGENTS.md exceptions. README bootstrap was re-executed
+  successfully with project-local temp/cache paths; editable install and pip
+  check passed. The documented synthetic sample and its exit codes were verified.
+- CI uses read-only contents permissions, Ubuntu/Windows Python 3.14, pinned
+  action majors, lint/format/both pytest entries/smoke/self-scan/package checks;
+  executable checks run only on Windows. Optional v* release requires CI,
+  checks package/tag agreement, rebuilds/verifies assets, creates checksums and
+  uploads with GitHub CLI. Only publish gets contents: write. No PyPI upload.
+- Action-major references and PyInstaller behavior checked against primary docs:
+  https://github.com/actions/checkout, https://github.com/actions/setup-python,
+  https://github.com/actions/upload-artifact,
+  https://pyinstaller.org/en/stable/usage.html.
+- SARIF structure follows the OASIS 2.1.0 description, with no schema download:
+  https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/sarif-v2.1.0-errata01-os-complete.html.
+- Not verified: hosted CI, Linux execution, GitHub artifact/release/SARIF upload,
+  push protection, SmartScreen/reputation behavior, code signing and manual
+  browser rendering/filter interaction. The executable is unsigned. Docker is
+  out of scope. No push, tag, remote repository creation or release was performed.
