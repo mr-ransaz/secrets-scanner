@@ -9,6 +9,8 @@ Repository: [mr-ransaz/secrets-scanner](https://github.com/mr-ransaz/secrets-sca
 Distribution: `secrets-scanner`; import package and command: `secretscan`.
 Local Windows checks are recorded in [NOTES.md](NOTES.md). Hosted CI has **not**
 been executed or verified. No artifacts have been published.
+Local regression: 46 tests through each pytest entry point, 98.78% combined
+statement/branch coverage, with branch measurement enabled.
 
 ## PowerShell quick start
 

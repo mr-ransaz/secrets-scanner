@@ -114,3 +114,19 @@
   push protection, SmartScreen/reputation behavior, code signing and manual
   browser rendering/filter interaction. The executable is unsigned. Docker is
   out of scope. No push, tag, remote repository creation or release was performed.
+
+## Final checkpoint
+
+- Last implementation commit: 1530b84. Final documentation checkpoint records
+  verified results; application code is unchanged after that commit.
+- Final full-tree self-scan: 31 files, zero findings, exit 0 (coverage.json is
+  generated/ignored by Git but included in the scanner's file count).
+- Final wheel/sdist rebuild and disposable wheel verification passed with the
+  final application code. SHA256SUMS contains exactly the exe, wheel and sdist;
+  all three digests were independently recomputed with hashlib.sha256 and matched.
+  No generated dist artifacts are tracked. A final docs-only rebuild refreshes
+  the package metadata and source archive; checksums are regenerated afterward.
+- Demo input and masked reports remain under ignored .work/demo intentionally
+  for owner inspection. Smoke, executable and wheel verifiers cleaned their
+  per-run scratch directories. All local gates passed; manual checks remain
+  exactly those listed above and in STATE.md.
