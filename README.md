@@ -9,7 +9,7 @@ Repository: [mr-ransaz/secrets-scanner](https://github.com/mr-ransaz/secrets-sca
 Distribution: `secrets-scanner`; import package and command: `secretscan`.
 Local Windows checks are recorded in [NOTES.md](NOTES.md). Hosted CI has **not**
 been executed or verified. No artifacts have been published.
-Local regression: 46 tests through each pytest entry point, 98.78% combined
+Local regression: 93 tests through each pytest entry point, 99.10% combined
 statement/branch coverage, with branch measurement enabled.
 
 ## PowerShell quick start
@@ -208,6 +208,31 @@ SARIF 2.1.0 includes rule metadata, relative URI locations, Unicode code-point
 columns, severity levels and `partialFingerprints`. It is **structurally tested
 only**, without external schema downloads or a verified GitHub SARIF upload.
 
+## Using the exe
+
+- **Double-click** `secretscan.exe` in Explorer to use guided mode. Enter a folder
+  path (quotes are accepted), or press Enter for the current working folder.
+  It runs the same default scan, prints masked text, and waits for Enter before
+  closing, including after a scan/report error.
+- **Drag a folder onto the exe** to scan that folder directly in guided mode.
+  It offers to open the HTML report in your default browser; the default is No.
+- **In a terminal**, use `secretscan.exe scan PATH`, `rules`, or `--version` as
+  usual. A bare folder argument gives a `scan PATH` hint and exits 2. No arguments
+  still give a usage error. Redirected input/output never triggers prompts.
+
+Guided mode requires Windows, interactive stdin/stdout, and a console containing
+only this process (or its verified PyInstaller bootloader parent). Console API
+failures preserve CLI behavior. Normal subcommands/options always use the CLI.
+Guided reports are named `secretscan-report-YYYYMMDD-HHMMSS.html` using local time.
+They go to the current working directory, then temp or existing Documents as
+fallbacks, always outside the resolved scan tree and with exclusive creation.
+Existing files are never replaced. If no safe writable location is available,
+the error remains visible until Enter. Only `y` opens the local HTML file.
+
+Interactive behavior and console selection are tested with mocks and simulated
+input. Actual Explorer double-click/drag-and-drop and browser interaction still
+require the manual Windows checks in NOTES.md.
+
 ## Windows executable and packaging
 
 ```powershell
@@ -258,7 +283,9 @@ need permission for that test; ordinary filesystem-capable runs passed locally.
 
 The live smoke script checks text/JSON/SARIF/HTML, exits 0/1/2, baseline round trip
 and absence of full synthetic values in every output. It cleans temporary data
-in `finally`. Verification details are recorded in NOTES.md and STATE.md.
+in `finally`. It also checks redirected no-argument, bare-folder and nonexistent
+path invocations exit 2 without prompts. Verification details are recorded in
+NOTES.md and STATE.md.
 
 `.github/workflows/ci.yml` has read-only contents permission and Python 3.14 on
 Ubuntu and Windows. It runs dependency checks, lint, format, both pytest entry

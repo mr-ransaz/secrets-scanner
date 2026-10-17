@@ -115,10 +115,10 @@
   browser rendering/filter interaction. The executable is unsigned. Docker is
   out of scope. No push, tag, remote repository creation or release was performed.
 
-## Final checkpoint
+## Initial 0.1.0 checkpoint
 
-- Last implementation commit: 1530b84. Final documentation checkpoint records
-  verified results; application code is unchanged after that commit.
+- Initial implementation commit: 1530b84. That documentation checkpoint recorded
+  verified results with application code unchanged after that commit.
 - Final full-tree self-scan: 31 files, zero findings, exit 0 (coverage.json is
   generated/ignored by Git but included in the scanner's file count).
 - Final wheel/sdist rebuild and disposable wheel verification passed with the
@@ -130,3 +130,71 @@
   for owner inspection. Smoke, executable and wheel verifiers cleaned their
   per-run scratch directories. All local gates passed; manual checks remain
   exactly those listed above and in STATE.md.
+
+## Windows guided startup — unreleased 0.1.0
+
+- Session started on clean main at 803b848, Python 3.14.0. No release tag is
+  recorded; version remains 0.1.0. Runtime/dev dependencies are unchanged.
+- Guided mode is selected only for no arguments or one existing directory,
+  with interactive stdin/stdout and a Windows-owned console. All ordinary
+  subcommands/options bypass it. Terminals retain usage exit 2 without prompts;
+  bare directory arguments receive a constant scan PATH hint without echoing
+  their value. Other platforms and failed console probes retain CLI behavior.
+- GetConsoleProcessList counts attached processes. PyInstaller one-file mode
+  has a waiting bootloader and application child, so that exact PID pair is
+  accepted only for frozen builds after QueryFullProcessImageNameW verifies
+  the parent's executable. Any other attached process prevents guided mode.
+  The process handle is query-only and closed in finally.
+- Primary API/bootloader descriptions checked by reading:
+  https://learn.microsoft.com/en-us/windows/console/getconsoleprocesslist,
+  https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamew,
+  https://pyinstaller.org/en/stable/advanced-topics.html.
+- Guided scans reuse the scanner, masked text formatter and HTML renderer.
+  Quoted paths and Enter for current folder are supported. All output report
+  candidates are resolved, must be outside the scan root, and use exclusive
+  creation. Current directory, temp and existing Documents are tried in order;
+  collisions/unwritable locations fall through without replacing a file.
+- Browser opening uses a generated local file URI only after y. No opens it by
+  default; browser failure prints a constant notice and preserves scan status.
+  Scan/report errors return 2 with no raw exceptions. Interactive runs pause
+  in finally; redirected streams never prompt. No detection/masking rules changed.
+- Local module/executable pytest: 93 passed each; combined coverage 99.10%.
+  Guided module: 100% statement/branch coverage using mocked native APIs and
+  simulated input. Tests include quoted paths with spaces, console ownership,
+  frozen parent verification, missing paths, TTY combinations, collisions,
+  outside-tree placement, unwritable fallback, browser consent/failure,
+  cancellation/error pauses and normal CLI commands. All writes stay in fixtures.
+- Location fallbacks are discovered lazily, so a usable current directory does
+  not cause temp-directory discovery/probing. Inaccessible discovery functions
+  also fall through. A focused run passed all 47 guided tests but failed the
+  global 90% coverage gate because the rest of the application was not exercised;
+  the subsequent full suites passed without changing or disabling the threshold.
+- Final pre-commit gates passed: Ruff check/format, both pytest entry points,
+  diff/placeholder review and smoke. Self-scan: 33 files, zero findings, exit 0.
+  Placeholder matches are the documented AGENTS.md examples only. Native Windows
+  API probe succeeded: three attached processes, ownership false; parent-image
+  query executed successfully. This does not establish Explorer behavior.
+- PyInstaller 6.22.3 / hooks 2026.8 rebuilt the one-file executable: 9,648,309
+  bytes. Executable verification passed with exit 0:
+  `smoke: text/json/sarif/html, exits 0/1/2, baseline, masking: PASS`
+  `startup: redirected no-args/folder/missing, exit 2, no prompts: PASS`
+  `exe verification: PASS; version, rules, text/JSON/SARIF/HTML, exits, baseline, masking`
+  `exe startup verification: PASS; redirected no-args/folder/missing, exit 2, no prompts`
+  pip check passed. No dependencies were added or changed.
+- Implementation commit: 04db134. All gates were rerun after that commit:
+  Ruff check/format, both pytest entries (93 each, 99.10%), diff/placeholder
+  checks, live smoke, executable verifier and self-scan passed. Coverage totals
+  are 496/500 statements and 162/164 branches (98.78%).
+- Wheel/sdist rebuilt for the same unreleased version, and disposable wheel
+  console verification/pip check passed. SHA256SUMS was regenerated for the exe,
+  wheel and sdist. Documentation metadata is refreshed in the final package
+  rebuild; no generated artifacts are committed.
+- The smoke/executable verifier additionally checks redirected no-args, bare
+  directory and missing-path invocations: exit 2, no guided prompts. Actual
+  Explorer interactions cannot be established with redirected input.
+- MANUAL CHECKS: double-click the rebuilt exe; scan a prepared synthetic folder
+  (quoted path with spaces and Enter for current folder), inspect masked output,
+  outside-tree report and exit pause. Drag a folder onto it; test browser No/Yes,
+  report rendering/filtering, and an invalid folder/error pause. Confirm terminal
+  no-args/bare-folder use exits 2 without waiting. Explorer behavior, browser
+  launch/rendering, SmartScreen, Linux and hosted CI remain unverified here.
