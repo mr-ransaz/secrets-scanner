@@ -3,9 +3,11 @@
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 from secretscan import __version__
+from secretscan.guided import bare_directory, guided_mode, run_guided
 from secretscan.history import scan_history
 from secretscan.reports import html_report, sarif
 from secretscan.rules import RULES
@@ -109,7 +111,17 @@ def text_output(result: Result) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parser().parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if guided_mode(arguments):
+        return run_guided(arguments[0] if arguments else None)
+    if bare_directory(arguments):
+        print(
+            "secretscan: error: use 'scan PATH' for a folder in a terminal; "
+            "use --help for usage",
+            file=sys.stderr,
+        )
+        return 2
+    args = parser().parse_args(arguments)
     if args.command == "rules":
         for rule in RULES:
             print(f"{rule.id}\t{rule.severity}\t{rule.description}")
@@ -174,8 +186,6 @@ def main(argv: list[str] | None = None) -> int:
         return int(bool(result.findings))
     except (ScanError, OSError, ValueError, OverflowError) as error:
         # Constant errors avoid leaking secret-bearing paths or OS exception details.
-        import sys
-
         message = (
             str(error)
             if isinstance(error, ScanError)

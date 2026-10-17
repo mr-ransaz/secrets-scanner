@@ -15,6 +15,7 @@ try {
     & .\.venv\Scripts\python.exe scripts\smoke_test.py --exe $ExePath
     if ($LASTEXITCODE -ne 0) { throw 'Executable smoke verification failed' }
     Write-Output 'exe verification: PASS; version, rules, text/JSON/SARIF/HTML, exits, baseline, masking'
+    Write-Output 'exe startup verification: PASS; redirected no-args/folder/missing, exit 2, no prompts'
 }
 finally {
     Pop-Location

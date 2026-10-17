@@ -21,6 +21,7 @@ def run_checks(command: list[str], work: Path) -> None:
             command + arguments,
             cwd=work,
             capture_output=True,
+            input="",
             text=True,
             timeout=60,
             check=False,
@@ -74,6 +75,27 @@ def run_checks(command: list[str], work: Path) -> None:
     invoke(["scan", str(tree), "--unknown"], 2)
 
 
+def run_startup_checks(command: list[str], work: Path) -> None:
+    for arguments in ([], [str(work / "tree")], [str(work / "missing")]):
+        process = subprocess.run(
+            command + arguments,
+            cwd=work,
+            input="\n",
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        text = process.stdout + process.stderr
+        if process.returncode != 2 or "use --help" not in text:
+            raise RuntimeError("redirected startup did not preserve CLI usage errors")
+        if any(
+            prompt in text
+            for prompt in ("Folder path", "Open HTML report", "Press Enter")
+        ):
+            raise RuntimeError("redirected startup prompted for input")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", type=Path)
@@ -93,7 +115,9 @@ def main() -> int:
     scratch = tempfile.TemporaryDirectory(prefix="run-", dir=parent)
     try:
         run_checks(command, Path(scratch.name))
+        run_startup_checks(command, Path(scratch.name))
         print("smoke: text/json/sarif/html, exits 0/1/2, baseline, masking: PASS")
+        print("startup: redirected no-args/folder/missing, exit 2, no prompts: PASS")
         return 0
     except OSError, ValueError, RuntimeError, subprocess.SubprocessError:
         print("smoke: FAIL (no raw process output displayed)", file=sys.stderr)
