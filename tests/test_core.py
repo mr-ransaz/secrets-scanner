@@ -91,6 +91,23 @@ def test_ignore_baseline_severity():
     assert not scan_line(lines()["jwt"], "x", 1, "high")
 
 
+def test_unquoted_literals_and_labels(tmp_path):
+    from secretscan.rules import safe_label
+
+    value = samples()["credential-assignment"]
+    findings = scan_line("password=" + value, "x", 1)
+    assert "credential-assignment" in {f.rule_id for f in findings}
+    assert findings[0].column_start == 10
+    assert findings[0].column_end == 10 + len(value)
+    secret_name = samples()["aws-access-key"]
+    root = tmp_path / secret_name
+    root.mkdir()
+    (root / (secret_name + ".txt")).write_text(secret_name)
+    assert secret_name not in json.dumps(scan(root).to_dict())
+    overlapping = "pass" + "word=" + samples()["high-entropy"]
+    assert samples()["high-entropy"] not in safe_label(overlapping)
+
+
 def test_files(tmp_path):
     (tmp_path / "plain.txt").write_bytes(b"harmless\xff\n")
     (tmp_path / "binary.txt").write_bytes(b"a\x00b")

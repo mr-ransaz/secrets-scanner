@@ -1,14 +1,14 @@
 # Project state
 
 - Version: 0.1.0; branch: main; no release tags created.
-- Bootstrap base and last existing implementation commit: a40faa3.
-- Stage 1 implemented: rules, masking, fingerprint baselines, inline ignores,
-  file safety, CLI, text/JSON and regression tests.
+- Last implementation checkpoint: 83f2646 (Stage 1).
+- Stages 1–2 implemented: safe rules/CLI/baselines, bounded Git history,
+  text/JSON/SARIF, escaped HTML, path masking and subprocess smoke.
 - Python 3.14.0; editable dev install succeeded; pip check passed.
-- Local tests: 36 passed; branch coverage enabled; combined coverage 97.89%.
+- Local tests: 44 passed; branch coverage enabled; combined coverage 98.73%.
 - Ruff check/format, both pytest entry points and diff checks passed.
 - Placeholder matches: AGENTS.md documented exceptions only.
-- Local CLI self-scan: 16 files, zero findings, exit 0.
-- Remaining: Stage 2 history/SARIF/HTML/smoke, Stage 3 executable/CI/packaging,
-  complete docs and final regression.
+- Live smoke: text/JSON/SARIF/HTML, exits 0/1/2, baseline, masking PASS, exit 0.
+- Stage 2 self-scan: 20 files, zero findings, exit 0.
+- Remaining: Stage 3 executable/CI/packaging, complete docs, final regression.
 - Docker is out of scope. Hosted CI and external release remain unverified.

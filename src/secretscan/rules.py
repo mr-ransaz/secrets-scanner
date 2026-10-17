@@ -72,7 +72,8 @@ RULES = (
         "medium",
         "Credential literal with length/entropy heuristic",
         re.compile(
-            r"\b(?:password|secret|token|api_key)\s{0,16}[:=]\s{0,16}[\"']([^\"'\r\n]{1,512})[\"']",
+            r"\b(?:password|secret|token|api_key)\s{0,16}[:=]\s{0,16}"
+            r"(?:[\"']([^\"'\r\n]{1,512})[\"']|([^\s\"'#;]{1,512})(?=\s|$))",
             re.I,
         ),
         1,
@@ -128,6 +129,33 @@ def accepted(rule: Rule, value: str) -> bool:
 
 def mask(value: str) -> str:
     return value[:2] + "****" + value[-2:] if len(value) > 4 else "****"
+
+
+def match_value(rule: Rule, match: re.Match[str]) -> tuple[str, int, int]:
+    group = rule.group
+    if rule.id == "credential-assignment" and match.group(1) is None:
+        group = 2
+    start, end = match.span(group)
+    return match.group(group), start, end
+
+
+def safe_label(value: str) -> str:
+    """Mask secret-like substrings in filenames and root labels as well."""
+    spans = []
+    for rule in RULES:
+        for match in rule.pattern.finditer(value):
+            candidate, start, end = match_value(rule, match)
+            if accepted(rule, candidate):
+                spans.append((start, end))
+    merged = []
+    for start, end in sorted(spans):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+        else:
+            merged.append((start, end))
+    for start, end in reversed(merged):
+        value = value[:start] + mask(value[start:end]) + value[end:]
+    return value
 
 
 def fingerprint(rule_id: str, path: str, value: str) -> str:

@@ -3,10 +3,19 @@
 import fnmatch
 import os
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from secretscan import __version__
-from secretscan.rules import LEVELS, RULES, accepted, fingerprint, mask
+from secretscan.rules import (
+    LEVELS,
+    RULES,
+    accepted,
+    fingerprint,
+    mask,
+    match_value,
+    safe_label,
+)
 
 DEFAULT_EXCLUDES = (
     ".git",
@@ -63,6 +72,10 @@ class Result:
     skipped: dict[str, int] = field(default_factory=dict)
     git_history: bool = False
     version: str = __version__
+    time: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    def __post_init__(self) -> None:
+        self.root_name = safe_label(self.root_name)
 
     def skip(self, reason: str) -> None:
         self.skipped[reason] = self.skipped.get(reason, 0) + 1
@@ -86,18 +99,17 @@ def scan_line(
         if LEVELS[rule.severity] < LEVELS[minimum]:
             continue
         for match in rule.pattern.finditer(text):
-            value = match.group(rule.group)
+            value, start, end = match_value(rule, match)
             if not accepted(rule, value):
                 continue
             digest = fingerprint(rule.id, path, value)
             if baseline and digest in baseline:
                 continue
-            start, end = match.span(rule.group)
             findings.append(
                 Finding(
                     rule.id,
                     rule.severity,
-                    path,
+                    safe_label(path),
                     number,
                     start + 1,
                     end + 1,

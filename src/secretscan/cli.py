@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 
 from secretscan import __version__
+from secretscan.history import scan_history
+from secretscan.reports import html_report, sarif
 from secretscan.rules import RULES
 from secretscan.scanner import Result, ScanError, scan
 
@@ -22,7 +24,10 @@ def parser() -> Parser:
     commands.add_parser("rules", help="list detection rules")
     command = commands.add_parser("scan", help="scan a file or directory")
     command.add_argument("path", type=Path)
-    command.add_argument("--format", choices=("text", "json"), default="text")
+    command.add_argument("--format", choices=("text", "json", "sarif"), default="text")
+    command.add_argument("--report", type=Path)
+    command.add_argument("--git-history", action="store_true")
+    command.add_argument("--max-commits", type=int, default=200)
     command.add_argument("--output", type=Path)
     command.add_argument(
         "--min-severity", choices=("low", "medium", "high"), default="low"
@@ -108,14 +113,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{rule.id}\t{rule.severity}\t{rule.description}")
         return 0
     try:
-        if args.max_file_size < 1 or (args.output and args.format == "text"):
-            raise ScanError("positive size and JSON output format required")
+        if args.max_file_size < 1 or args.max_commits < 1:
+            raise ScanError("size and commit limits must be positive")
+        if args.output and args.format == "text":
+            raise ScanError("--output requires JSON or SARIF format")
         root = args.path.absolute()
         if root.is_symlink() or root.is_junction():
             raise ScanError("scan root must not be a symlink or junction")
         root = root.resolve()
         validate_destinations(
-            [args.output, args.write_baseline], root, args.force, args.allow_in_tree
+            [args.output, args.report, args.write_baseline],
+            root,
+            args.force,
+            args.allow_in_tree,
         )
         baseline = load_baseline(args.baseline)
         result = scan(
@@ -125,15 +135,30 @@ def main(argv: list[str] | None = None) -> int:
             max_file_size=args.max_file_size,
             baseline=baseline,
         )
+        if args.git_history:
+            scan_history(
+                root,
+                result,
+                max_commits=args.max_commits,
+                minimum=args.min_severity,
+                excludes=tuple(args.exclude),
+                max_file_size=args.max_file_size,
+                baseline=baseline,
+            )
         output = (
-            json.dumps(result.to_dict(), indent=2) + "\n"
-            if args.format == "json"
+            json.dumps(
+                sarif(result) if args.format == "sarif" else result.to_dict(), indent=2
+            )
+            + "\n"
+            if args.format != "text"
             else text_output(result)
         )
         if args.output:
             write(args.output, output, args.force)
         else:
             print(output, end="")
+        if args.report:
+            write(args.report, html_report(result), args.force)
         if args.write_baseline:
             data = {
                 "fingerprints": sorted(
